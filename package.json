@@ -1,0 +1,20 @@
+{
+  "name": "ai-search-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "update-env": "node update-frontend-env.mjs",
+    "start:frontend": "npm run update-env && docker compose up -d --build frontend"
+  },
+  "dependencies": {
+    "@pinecone-database/pinecone": "^2.2.0",
+    "express": "^5.1.0",
+    "node-fetch": "^3.3.2",
+    "sharp": "^0.34.4"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.13"
+  }
+}

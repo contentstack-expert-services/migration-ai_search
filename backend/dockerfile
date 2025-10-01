@@ -1,0 +1,27 @@
+FROM --platform=linux/amd64 node:18
+
+# Install build tools + sharp dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+# Force downgrade ChromaDB to compatible version
+RUN npm uninstall chromadb
+RUN npm install
+
+COPY . .
+
+EXPOSE 4000
+CMD ["node", "server.js"]

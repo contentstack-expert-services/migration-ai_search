@@ -1,0 +1,31 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - aisearch_net
+
+  backend:
+    build: ./backend
+    platform: linux/amd64
+    command: bash -c "
+      npm rebuild sharp --platform=linux --arch=x64 --verbose &&
+      node server.js
+      "
+    environment:
+      - PORT=4000
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - PINECONE_API_KEY=pcsk_2F897C_AZshZHXE5kVqg6HvZdqdjEdURdkbkisC8BMx3gVpCehaAefrNSDwncY8L97X6pm
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend/docs:/app/docs
+    networks:
+      - aisearch_net
+
+networks:
+  aisearch_net:
+    driver: bridge
