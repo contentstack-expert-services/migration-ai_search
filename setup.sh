@@ -2,29 +2,44 @@
 set -e
 
 echo "======================================="
-echo " 🛠️  AI Search Assistant Setup Script "
+echo " 🛠️  AI Search Assistant Auto Setup "
 echo "======================================="
 
-# --- Check dependencies ---
-check_command() {
-  if ! command -v "$1" &> /dev/null
-  then
-    echo "❌ $1 not found."
-    return 1
+OS_TYPE=$(uname -s)
+
+install_if_missing() {
+  local cmd=$1
+  local install_mac=$2
+  local install_linux=$3
+
+  if ! command -v "$cmd" &> /dev/null; then
+    echo "❌ $cmd not found. Installing..."
+    if [[ "$OS_TYPE" == "Darwin" ]]; then
+      if ! command -v brew &> /dev/null; then
+        echo "❌ Homebrew not found. Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      fi
+      eval "$install_mac"
+    elif [[ "$OS_TYPE" == "Linux" ]]; then
+      sudo apt-get update -y
+      eval "$install_linux"
+    else
+      echo "⚠️ Unsupported OS. Please install $cmd manually."
+      exit 1
+    fi
   else
-    echo "✅ $1 found."
-    return 0
+    echo "✅ $cmd found."
   fi
 }
 
+# --- Install required tools ---
 echo "🔍 Checking prerequisites..."
-check_command docker || { echo "👉 Install Docker: https://docs.docker.com/get-docker/"; exit 1; }
-check_command docker-compose || { echo "👉 Install Docker Compose: https://docs.docker.com/compose/install/"; exit 1; }
-check_command curl || { echo "👉 Install curl before running this script."; exit 1; }
-check_command jq || { echo "👉 Install jq: brew install jq (Mac) OR sudo apt-get install jq (Linux)"; exit 1; }
+install_if_missing docker "brew install --cask docker" "sudo apt-get install -y docker.io"
+install_if_missing docker-compose "brew install docker-compose" "sudo apt-get install -y docker-compose"
+install_if_missing curl "brew install curl" "sudo apt-get install -y curl"
+install_if_missing jq "brew install jq" "sudo apt-get install -y jq"
 
 # --- Detect OS for Ollama host ---
-OS_TYPE=$(uname -s)
 if [[ "$OS_TYPE" == "Darwin" ]]; then
   OLLAMA_HOST_URL="http://host.docker.internal:11434"
   echo "🖥️  Detected macOS → using $OLLAMA_HOST_URL"
@@ -37,27 +52,25 @@ else
   echo "⚠️ Unknown OS, defaulting to $OLLAMA_HOST_URL"
 fi
 
-# --- Check Ollama ---
-if ! check_command ollama; then
-  echo "❌ Ollama not found."
+# --- Install Ollama ---
+if ! command -v ollama &> /dev/null; then
+  echo "❌ Ollama not found. Installing..."
   if [[ "$OS_TYPE" == "Darwin" ]]; then
-    echo "👉 Install Ollama on Mac:"
-    echo "   brew install ollama"
-    echo "   ollama serve"
+    brew install ollama
   elif [[ "$OS_TYPE" == "Linux" ]]; then
-    echo "👉 Install Ollama on Linux:"
-    echo "   curl -fsSL https://ollama.com/install.sh | sh"
-    echo "   ollama serve"
+    curl -fsSL https://ollama.com/install.sh | sh
   fi
-  exit 1
+else
+  echo "✅ Ollama found."
 fi
 
-# --- Pull Ollama model ---
+# --- Ensure Ollama is running ---
+echo "▶️ Starting Ollama in background..."
+ollama serve &> /dev/null &
+
+# --- Pull model ---
 echo "📥 Pulling Ollama model llama3..."
-ollama pull llama3 || {
-  echo "❌ Failed to pull Ollama model. Make sure Ollama is running with: ollama serve"
-  exit 1
-}
+ollama pull llama3
 
 # --- Setup .env ---
 if [ ! -f .env ]; then
@@ -68,46 +81,4 @@ PINECONE_API_KEY=your_pinecone_key
 PINECONE_INDEX=docs
 
 # Ollama
-OLLAMA_HOST=$OLLAMA_HOST_URL
-EOL
-  echo "⚠️  Please edit .env and add your Pinecone API key."
-else
-  echo "✅ .env file already exists (not overwritten)."
-fi
-
-# --- Validate Pinecone key ---
-source .env
-if [[ "$PINECONE_API_KEY" == "your_pinecone_key" ]]; then
-  echo "⚠️ Pinecone API key not set. Please update .env before running the app."
-else
-  echo "🔍 Validating Pinecone API key..."
-  RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-    -H "Api-Key: $PINECONE_API_KEY" \
-    https://api.pinecone.io/indexes)
-  if [[ "$RESPONSE" == "200" ]]; then
-    echo "✅ Pinecone API key is valid."
-  else
-    echo "❌ Pinecone API key check failed (HTTP $RESPONSE). Please verify your key in .env."
-    exit 1
-  fi
-fi
-
-# --- Build + Run Docker ---
-echo "🐳 Building Docker images..."
-docker compose build --no-cache
-
-echo "🚀 Starting containers..."
-docker compose up -d
-
-echo "======================================="
-echo " ✅ Setup complete! "
-echo "---------------------------------------"
-echo "Frontend → http://localhost"
-echo "Backend  → http://localhost:4000"
-echo
-echo "👉 Put your docs inside backend/docs/ and restart with:"
-echo "   docker compose restart backend"
-echo
-echo "👉 Remember to run Ollama separately with:"
-echo "   ollama serve"
-echo "======================================="
+OLLAMA_HO_
